@@ -76,7 +76,7 @@ REM Make sure $RABBITMQ_BASE contains no non-ASCII characters.
 if not exist "!RABBITMQ_BASE!" (
     mkdir "!RABBITMQ_BASE!"
 )
-for /f "delims=" %%F in ("!RABBITMQ_BASE!") do set RABBITMQ_BASE=%%~sF
+for /f "delims=" %%F in ("!RABBITMQ_BASE!") do CALL :eval_path RABBITMQ_BASE "%%~F"
 
 REM Check for the short names here too
 if "!RABBITMQ_USE_LONGNAME!"=="true" (
@@ -174,7 +174,7 @@ if "!RABBITMQ_SERVER_ERL_ARGS!"=="" (
 )
 
 REM [ "x" = "x$RABBITMQ_CONFIG_FILE" ] && RABBITMQ_CONFIG_FILE=${CONFIG_FILE}
-CALL :unquote RABBITMQ_CONFIG_FILE %RABBITMQ_CONFIG_FILE%
+CALL :unquote RABBITMQ_CONFIG_FILE "%RABBITMQ_CONFIG_FILE:"=%"
 if "!RABBITMQ_CONFIG_FILE!"=="" (
     if "!CONFIG_FILE!"=="" (
         set RABBITMQ_CONFIG_FILE=!RABBITMQ_BASE!\rabbitmq
@@ -191,7 +191,7 @@ if "!RABBITMQ_GENERATED_CONFIG_DIR!"=="" (
     )
 )
 
-CALL :unquote RABBITMQ_ADVANCED_CONFIG_FILE %RABBITMQ_ADVANCED_CONFIG_FILE%
+CALL :unquote RABBITMQ_ADVANCED_CONFIG_FILE "%RABBITMQ_ADVANCED_CONFIG_FILE:"=%"
 if "!RABBITMQ_ADVANCED_CONFIG_FILE!"=="" (
     if "!ADVANCED_CONFIG_FILE!"=="" (
         set RABBITMQ_ADVANCED_CONFIG_FILE=!RABBITMQ_BASE!\advanced.config
@@ -292,7 +292,7 @@ REM non-US-ASCII characters.
 REM [ "x" = "x$RABBITMQ_ENABLED_PLUGINS_FILE" ] && RABBITMQ_ENABLED_PLUGINS_FILE=${ENABLED_PLUGINS_FILE}
 if "!RABBITMQ_ENABLED_PLUGINS_FILE!"=="" (
     if "!ENABLED_PLUGINS_FILE!"=="" (
-        set RABBITMQ_ENABLED_PLUGINS_FILE=!RABBITMQ_BASE!\enabled_plugins
+        set RABBITMQ_ENABLED_PLUGINS_FILE="!RABBITMQ_BASE!\enabled_plugins"
     ) else (
         set RABBITMQ_ENABLED_PLUGINS_FILE=!ENABLED_PLUGINS_FILE!
     )
@@ -441,6 +441,7 @@ REM Ensure all paths in ERL_LIBS do not contains non-ASCII characters.
 set ERL_LIBS_orig=%ERL_LIBS%
 set ERL_LIBS=
 call :filter_paths "%ERL_LIBS_orig%"
+CALL :unquote ERL_LIBS "%ERL_LIBS:"=%"
 goto :filter_paths_done
 
 :filter_paths
@@ -455,11 +456,16 @@ exit /b
 
 :filter_path
 REM Ensure ERL_LIBS begins with valid path
+set __PARAM__=%1
+CALL :unquote __PARAM__ "%__PARAM__:"=%"
 IF "%ERL_LIBS%"=="" (
-    set ERL_LIBS=%~dps1%~n1%~x1
+    CALL :eval_path ERL_LIBS "%__PARAM__%"
 ) else (
-    set ERL_LIBS=%ERL_LIBS%;%~dps1%~n1%~x1
+    CALL :eval_path ERL_LIBS_TMP "%__PARAM__%"
+    set ERL_LIBS="%ERL_LIBS%;%ERL_LIBS_TMP%"
+    set ERL_LIBS_TMP=
 )
+set __PARAM__=
 exit /b
 
 :filter_paths_done
@@ -479,6 +485,15 @@ REM ##--- End of overridden <var_name> variables
 REM
 REM # Since we source this elsewhere, don't accidentally stop execution
 REM true
+
+REM Param1: TargetVar InputString
+:eval_path
+    set __Retval__="%2:"=%"
+    set __Retval__="%~dpsnx2"
+    CALL :unquote __Retval__ "%__Retval__:"=%"
+    set "%1=%__Retval__%"
+    set __Retval__=
+EXIT /B 0
 
 :unquote
 set %1=%~2
